@@ -1,0 +1,157 @@
+{% extends 'restaurante/base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2>Pedidos</h2>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">Nuevo Pedido</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Mesa</label>
+                <select id="mesa" class="form-select"></select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Productos</label>
+                <select id="productos" class="form-select" multiple></select>
+                <small class="text-muted">Ctrl+clic para varios</small>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Total ($)</label>
+                <input type="number" id="total" class="form-control">
+            </div>
+            <div class="col-12">
+                <button onclick="crearPedido()" class="btn btn-success">Crear Pedido</button>
+            </div>
+        </div>
+        <div id="mensajePedido" class="mt-2"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-dark text-white">Pedidos Registrados</div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Mesa</th>
+                    <th>Estado</th>
+                    <th>Total</th>
+                    <th>Total + IVA 19%</th>
+                    <th>Fecha</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody id="tablaPedidos"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+var TOKEN = localStorage.getItem('token');
+var API = 'http://127.0.0.1:8000/api';
+
+function cargarMesasSelect() {
+    fetch(API + '/mesas/', {
+        headers: { 'Authorization': 'Token ' + TOKEN }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(mesas) {
+        var select = document.getElementById('mesa');
+        select.innerHTML = '';
+        mesas.forEach(function(m) {
+            select.innerHTML += '<option value="' + m.id + '">Mesa ' + m.numero + '</option>';
+        });
+    });
+}
+
+function cargarProductosSelect() {
+    fetch(API + '/productos/', {
+        headers: { 'Authorization': 'Token ' + TOKEN }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(productos) {
+        var select = document.getElementById('productos');
+        select.innerHTML = '';
+        productos.forEach(function(p) {
+            select.innerHTML += '<option value="' + p.id + '">' + p.nombre + ' - $' + parseInt(p.precio).toLocaleString() + '</option>';
+        });
+    });
+}
+
+function cargarPedidos() {
+    fetch(API + '/pedidos/', {
+        headers: { 'Authorization': 'Token ' + TOKEN }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(pedidos) {
+        var tbody = document.getElementById('tablaPedidos');
+        tbody.innerHTML = '';
+        pedidos.forEach(function(p) {
+            var badge = p.estado === 'activo' ? 'bg-success' : 'bg-secondary';
+            var boton = p.estado === 'activo' ? '<button class="btn btn-warning btn-sm" onclick="facturar(' + p.id + ')">Facturar</button>' : '-';
+            tbody.innerHTML += '<tr>' +
+                '<td>' + p.id + '</td>' +
+                '<td>Mesa ' + p.mesa + '</td>' +
+                '<td><span class="badge ' + badge + '">' + p.estado + '</span></td>' +
+                '<td>$' + parseInt(p.total).toLocaleString() + '</td>' +
+                '<td>$' + p.total_con_iva.toLocaleString() + '</td>' +
+                '<td>' + new Date(p.fecha).toLocaleString() + '</td>' +
+                '<td>' + boton + '</td>' +
+                '</tr>';
+        });
+    });
+}
+
+function facturar(id) {
+    fetch(API + '/pedidos/' + id + '/', {
+        method: 'PATCH',
+        headers: {
+            'Authorization': 'Token ' + TOKEN,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ estado: 'facturado' })
+    })
+    .then(function(res) {
+        if (res.ok) cargarPedidos();
+    });
+}
+
+function crearPedido() {
+    var productosSeleccionados = Array.from(
+        document.getElementById('productos').selectedOptions
+    ).map(function(o) { return parseInt(o.value); });
+
+    fetch(API + '/pedidos/', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Token ' + TOKEN,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            mesa: parseInt(document.getElementById('mesa').value),
+            productos: productosSeleccionados,
+            estado: 'activo',
+            total: parseFloat(document.getElementById('total').value)
+        })
+    })
+    .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+    .then(function(result) {
+        var msg = document.getElementById('mensajePedido');
+        if (result.ok) {
+            msg.innerHTML = '<div class="alert alert-success">Pedido creado correctamente</div>';
+            cargarPedidos();
+        } else {
+            msg.innerHTML = '<div class="alert alert-danger">' + JSON.stringify(result.data) + '</div>';
+        }
+    });
+}
+
+cargarMesasSelect();
+cargarProductosSelect();
+cargarPedidos();
+</script>
+{% endblock %}

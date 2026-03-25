@@ -1,0 +1,104 @@
+{% extends 'restaurante/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🍲 Menú de Productos</h2>
+</div>
+
+<!-- FORMULARIO CREAR PRODUCTO -->
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">Agregar Producto</div>
+    <div class="card-body">
+        <form id="formProducto">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Nombre</label>
+                    <input type="text" id="nombre" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Descripción</label>
+                    <input type="text" id="descripcion" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Precio</label>
+                    <input type="number" id="precio" class="form-control" required>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">Crear Producto</button>
+                </div>
+            </div>
+        </form>
+        <div id="mensajeProducto" class="mt-2"></div>
+    </div>
+</div>
+
+<!-- LISTA DE PRODUCTOS -->
+<div class="card">
+    <div class="card-header bg-dark text-white">Productos Registrados</div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Precio</th>
+                    <th>Disponible</th>
+                </tr>
+            </thead>
+            <tbody id="tablaProductos"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('token');
+const API = 'http://127.0.0.1:8000/api';
+
+async function cargarProductos() {
+    const res = await fetch(`${API}/productos/`, {
+        headers: { 'Authorization': `Token ${TOKEN}` }
+    });
+    const productos = await res.json();
+    const tbody = document.getElementById('tablaProductos');
+    tbody.innerHTML = '';
+    productos.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${p.id}</td>
+                <td>${p.nombre}</td>
+                <td>${p.descripcion}</td>
+                <td>$${parseInt(p.precio).toLocaleString()}</td>
+                <td>${p.disponible ? '✅ Sí' : '❌ No'}</td>
+            </tr>`;
+    });
+}
+
+document.getElementById('formProducto').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API}/productos/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Token ${TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            nombre: document.getElementById('nombre').value,
+            descripcion: document.getElementById('descripcion').value,
+            precio: parseFloat(document.getElementById('precio').value),
+            disponible: true
+        })
+    });
+    const data = await res.json();
+    const msg = document.getElementById('mensajeProducto');
+    if (res.ok) {
+        msg.innerHTML = '<div class="alert alert-success">✅ Producto creado correctamente</div>';
+        cargarProductos();
+    } else {
+        msg.innerHTML = `<div class="alert alert-danger">❌ ${JSON.stringify(data)}</div>`;
+    }
+});
+
+cargarProductos();
+</script>
+{% endblock %}
